@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Алгоритм максимального потоку</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-top: 20px;
+        }
+
+        canvas {
+            background-color: #ffffff;
+            border: 2px solid #555;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 20px;
+            color: #2b7a78;
+            background-color: #def2f1;
+            padding: 10px 20px;
+            border: 2px solid #2b7a78;
+            border-radius: 5px;
+            text-align: center;
+            width: fit-content;
+        }
+
+        #result:hover {
+            background-color: #2b7a78;
+            color: #fff;
+            transition: 0.3s;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #2b7a78;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background-color: #176d5e;
+        }
+    </style>
+</head>
+<body>
+    <h1>Алгоритм максимального потоку</h1>
+    <canvas id="graphCanvas" width="800" height="600"></canvas>
+    <button id="showFlowButton">Показати максимальний потік</button>
+    <p id="result"></p>
+
+    <script>
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+        const showFlowButton = document.getElementById('showFlowButton');
+        const resultElement = document.getElementById('result');
+
+        const positions = {
+            1: { x: 50, y: 250 }, 2: { x: 150, y: 150 }, 3: { x: 250, y: 250 },
+            4: { x: 150, y: 350 }, 5: { x: 320, y: 300 }, 6: { x: 400, y: 150 },
+            7: { x: 450, y: 300 }, 8: { x: 550, y: 150 }, 9: { x: 330, y: 400 },
+            10: { x: 550, y: 400 }, 11: { x: 650, y: 300 }
+        };
+
+        const edges = [
+            { u: 1, v: 2, capacity: 3 }, { u: 1, v: 3, capacity: 3 },
+            { u: 2, v: 3, capacity: 6 }, { u: 2, v: 6, capacity: 20 },
+            { u: 3, v: 4, capacity: 10 }, { u: 3, v: 5, capacity: 20 },
+            { u: 3, v: 6, capacity: 9 }, { u: 4, v: 9, capacity: 3 },
+            { u: 5, v: 9, capacity: 5 }, { u: 5, v: 10, capacity: 3 },
+            { u: 5, v: 7, capacity: 7 }, { u: 6, v: 7, capacity: 3 },
+            { u: 7, v: 8, capacity: 3 }, { u: 7, v: 10, capacity: 9 },
+            { u: 8, v: 11, capacity: 8 }, { u: 9, v: 10, capacity: 8 },
+            { u: 10, v: 11, capacity: 8 }, { u: 4, v: 1, capacity: 0 },
+            { u: 6, v: 8, capacity: 0 },
+        ];
+
+        const source = 1; 
+        const sink = 11; 
+
+        let residualGraph = []; 
+        let maxFlow = 0; 
+
+        function bfs(residualGraph, parent) {
+            const visited = new Array(Object.keys(positions).length + 1).fill(false);
+            const queue = [source];
+            visited[source] = true;
+            parent[source] = -1;
+
+            while (queue.length > 0) {
+                const u = queue.shift();
+
+                for (let v = 1; v <= Object.keys(positions).length; v++) {
+                    if (!visited[v] && residualGraph[u][v] > 0) {
+                        queue.push(v);
+                        parent[v] = u;
+                        visited[v] = true;
+                        if (v === sink) return true; 
+                    }
+                }
+            }
+            return false; 
+        }
+
+        function calculateMaximumFlow() {
+            residualGraph = Array.from({ length: Object.keys(positions).length + 1 }, () =>
+                Array(Object.keys(positions).length + 1).fill(0)
+            );
+
+            for (const edge of edges) {
+                residualGraph[edge.u][edge.v] = edge.capacity; 
+            }
+
+            const parent = [];
+            maxFlow = 0;
+
+            while (bfs(residualGraph, parent)) {
+                let pathFlow = Infinity;
+
+                for (let v = sink; v !== source; v = parent[v]) {
+                    const u = parent[v];
+                    pathFlow = Math.min(pathFlow, residualGraph[u][v]);
+                }
+
+                for (let v = sink; v !== source; v = parent[v]) {
+                    const u = parent[v];
+                    residualGraph[u][v] -= pathFlow;
+                    residualGraph[v][u] += pathFlow; 
+                }
+
+                maxFlow += pathFlow; 
+            }
+
+            drawGraph(edges, residualGraph, false); 
+        }
+
+        function drawGraph(edges, residualGraph, showFlow = false) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (const edge of edges) {
+                const flow = edge.capacity - residualGraph[edge.u][edge.v];
+                const color = showFlow && flow > 0 ? 'red' : '#999';
+                drawLine(positions[edge.u], positions[edge.v], color, `${flow}/${edge.capacity}`);
+            }
+
+            for (const node in positions) {
+                drawNode(positions[node], node);
+            }
+        }
+
+        function drawLine(point1, point2, color, label) {
+            ctx.beginPath();
+            ctx.moveTo(point1.x, point1.y);
+            ctx.lineTo(point2.x, point2.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            const midX = (point1.x + point2.x) / 2;
+            const midY = (point1.y + point2.y) / 2;
+            ctx.fillStyle = '#333';
+            ctx.fillText(label, midX, midY);
+        }
+
+        function drawNode(point, label) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 20, 0, Math.PI * 2);
+            ctx.fillStyle = '#2b7a78';
+            ctx.fill();
+            ctx.strokeStyle = '#003a3a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.fillText(label, point.x, point.y);
+        }
+
+        calculateMaximumFlow();
+
+        showFlowButton.addEventListener('click', () => {
+            drawGraph(edges, residualGraph, true); 
+            resultElement.innerText = `Максимальний потік від вузла ${source} до вузла ${sink}: ${maxFlow}`;
+        });
+    </script>
+</body>
+</html>
